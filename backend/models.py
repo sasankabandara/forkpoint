@@ -59,6 +59,7 @@ class ConsequenceNode(BaseModel):
     parent_id: str
     ripple: Optional[RippleEffects] = None
     sensitive: bool = False
+    reasoning_trace: Optional[str] = None
 
 
 class BranchNode(BaseModel):
@@ -74,6 +75,7 @@ class BranchNode(BaseModel):
     parent_id: str
     ripple: Optional[RippleEffects] = None
     sensitive: bool = False
+    reasoning_trace: Optional[str] = None
     children: list[ConsequenceNode] = Field(default_factory=list)
 
 
@@ -84,6 +86,7 @@ class ScenarioTree(BaseModel):
     causes: list[CauseNode]
     consequences: list[ConsequenceNode]
     input: str
+    reasoning_trace: Optional[str] = None
 
 
 class GenerateResponse(BaseModel):

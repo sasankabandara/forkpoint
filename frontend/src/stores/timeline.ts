@@ -13,6 +13,8 @@ import type {
 const BRANCH_COLORS = ['blue', 'green', 'red', 'purple', 'orange', 'cyan', 'pink'] as const
 const NODE_WIDTH = 220
 const NODE_GAP = 60
+const SIGNPOST_WIDTH = 60
+const SIGNPOST_GAP = 40
 const BRANCH_Y_OFFSET = 140
 
 export const useTimelineStore = defineStore('timeline', () => {
@@ -124,6 +126,7 @@ export const useTimelineStore = defineStore('timeline', () => {
           nodeId: con.id,
           depth: con.depth,
           parentNodeId: con.parent_id,
+          reasoningTrace: con.reasoning_trace || treeData.reasoning_trace,
         }
       })
 
@@ -141,6 +144,9 @@ export const useTimelineStore = defineStore('timeline', () => {
     return { nodes: newNodes, edges: newEdges }
   }
 
+  // Current signpost ID for the in-progress fork
+  const currentSignpostId = ref<string | null>(null)
+
   // ── Actions ───────────────────────────────────────────
   function setTree(id: string, input: string, treeData: ScenarioTree) {
     scenarioId.value = id
@@ -149,21 +155,69 @@ export const useTimelineStore = defineStore('timeline', () => {
     branches.value = []
     selectedNodeId.value = null
     error.value = null
+    currentSignpostId.value = null
 
     const layout = computeMainLayout(treeData)
     nodes.value = layout.nodes
     edges.value = layout.edges
   }
 
+  function addSignpostNode(parentNodeId: string, whatif: string, branchColor: string): string {
+    const row = nextBranchRow.value
+    const branchY = row * BRANCH_Y_OFFSET
+    const parentNode = nodes.value.find(n => n.id === parentNodeId)
+    if (!parentNode) return ''
+
+    const signpostId = `${parentNodeId}-fork-${Date.now()}`
+    currentSignpostId.value = signpostId
+
+    nodes.value.push({
+      id: signpostId,
+      type: 'fork_signpost',
+      position: { x: parentNode.position.x + 30, y: branchY },
+      data: {
+        type: 'fork_signpost',
+        title: whatif,
+        summary: '',
+        whatif: whatif,
+        branchColor: branchColor,
+        nodeId: signpostId,
+        depth: row,
+        createdAt: new Date().toISOString(),
+      }
+    })
+
+    // Curved dashed connector from parent to signpost
+    edges.value.push({
+      id: `e-fork-${parentNodeId}-${signpostId}`,
+      source: parentNodeId,
+      target: signpostId,
+      type: 'smoothstep',
+      animated: true,
+      style: {
+        stroke: `var(--color-branch-${branchColor})`,
+        strokeDasharray: '6, 4',
+      },
+    })
+
+    return signpostId
+  }
+
   function addBranch(parentNodeId: string, branchNode: BranchNode, branchColor: string) {
     const row = nextBranchRow.value
     const branchY = row * BRANCH_Y_OFFSET
 
-    // Find parent node position
+    // Find the signpost node if it exists; otherwise find parent
+    const signpostId = currentSignpostId.value
+    const signpostNode = signpostId ? nodes.value.find(n => n.id === signpostId) : null
     const parentNode = nodes.value.find(n => n.id === parentNodeId)
     if (!parentNode) return
 
-    const parentX = parentNode.position.x
+    // Branch nodes start after the signpost (or after parent if no signpost)
+    const branchStartX = signpostNode
+      ? signpostNode.position.x + SIGNPOST_WIDTH + SIGNPOST_GAP
+      : parentNode.position.x
+
     const branchId = `branch-${branches.value.length + 1}`
 
     // Track branch
@@ -172,14 +226,14 @@ export const useTimelineStore = defineStore('timeline', () => {
       parentNodeId,
       color: branchColor,
       row,
-      nodes: [branchNode.id],
+      nodes: signpostId ? [signpostId, branchNode.id] : [branchNode.id],
     }
 
     // Add branch node
     nodes.value.push({
       id: branchNode.id,
       type: 'branch',
-      position: { x: parentX, y: branchY },
+      position: { x: branchStartX, y: branchY },
       data: {
         type: 'branch',
         title: branchNode.title,
@@ -195,13 +249,15 @@ export const useTimelineStore = defineStore('timeline', () => {
         nodeId: branchNode.id,
         depth: branchNode.depth,
         parentNodeId,
+        reasoningTrace: branchNode.reasoning_trace,
       }
     })
 
-    // Add connector from parent to branch node (curved dashed)
+    // Connector: signpost → first branch node (or parent → first if no signpost)
+    const connectorSource = signpostId || parentNodeId
     edges.value.push({
-      id: `e-fork-${parentNodeId}-${branchNode.id}`,
-      source: parentNodeId,
+      id: `e-fork-${connectorSource}-${branchNode.id}`,
+      source: connectorSource,
       target: branchNode.id,
       type: 'smoothstep',
       animated: true,
@@ -213,7 +269,7 @@ export const useTimelineStore = defineStore('timeline', () => {
 
     // Add child nodes along the branch
     branchNode.children.forEach((child, i) => {
-      const childX = parentX + (i + 1) * (NODE_WIDTH + NODE_GAP)
+      const childX = branchStartX + (i + 1) * (NODE_WIDTH + NODE_GAP)
       branchRecord.nodes.push(child.id)
 
       nodes.value.push({
@@ -253,6 +309,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     })
 
     branches.value.push(branchRecord)
+    currentSignpostId.value = null
   }
 
   function selectNode(nodeId: string | null) {
@@ -267,13 +324,22 @@ export const useTimelineStore = defineStore('timeline', () => {
   function addGhostNode(parentNodeId: string) {
     const row = nextBranchRow.value
     const branchY = row * BRANCH_Y_OFFSET
+
+    // Position ghost to the right of the signpost if it exists
+    const signpostNode = currentSignpostId.value
+      ? nodes.value.find(n => n.id === currentSignpostId.value)
+      : null
     const parentNode = nodes.value.find(n => n.id === parentNodeId)
-    if (!parentNode) return
+    if (!parentNode && !signpostNode) return
+
+    const ghostX = signpostNode
+      ? signpostNode.position.x + SIGNPOST_WIDTH + SIGNPOST_GAP
+      : (parentNode?.position.x ?? 0)
 
     nodes.value.push({
       id: 'ghost-loading',
       type: 'ghost',
-      position: { x: parentNode.position.x, y: branchY },
+      position: { x: ghostX, y: branchY },
       data: {
         type: 'ghost',
         title: 'Exploring...',
@@ -282,14 +348,16 @@ export const useTimelineStore = defineStore('timeline', () => {
       }
     })
 
+    // Connect signpost → ghost (or parent → ghost)
+    const ghostSource = currentSignpostId.value || parentNodeId
     edges.value.push({
-      id: `e-fork-${parentNodeId}-ghost`,
-      source: parentNodeId,
+      id: `e-fork-${ghostSource}-ghost`,
+      source: ghostSource,
       target: 'ghost-loading',
       type: 'smoothstep',
       animated: true,
       style: {
-        stroke: '#3d3f54',
+        stroke: `var(--color-branch-${nextBranchColor.value})`,
         strokeDasharray: '6, 4',
       },
     })
@@ -329,6 +397,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     selectedNode, nextBranchColor, nextBranchRow,
     // Actions
     setTree, addBranch, selectNode, addGhostNode, removeGhostNode,
-    getAncestorChain, reset,
+    addSignpostNode, getAncestorChain, reset,
+    currentSignpostId,
   }
 })

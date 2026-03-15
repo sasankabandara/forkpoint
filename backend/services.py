@@ -41,7 +41,6 @@ def _call_claude(prompt: str) -> dict:
     # Strip markdown code fences if present
     if raw.startswith("```"):
         lines = raw.split("\n")
-        # Remove first and last lines (```json and ```)
         lines = lines[1:]
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
@@ -54,10 +53,20 @@ def _call_claude(prompt: str) -> dict:
         raise ValueError(f"Claude returned invalid JSON: {e}")
 
 
+def _extract_reasoning(data: dict) -> tuple[str, dict]:
+    """Extract the reasoning trace from Claude's response.
+    Returns (reasoning_text, remaining_data)."""
+    reasoning = data.pop("reasoning", "")
+    return reasoning, data
+
+
 async def generate_scenario(input_text: str) -> GenerateResponse:
     """Generate a complete bidirectional timeline from a scenario description."""
     prompt = build_generate_prompt(input_text)
     data = _call_claude(prompt)
+
+    # Extract reasoning trace
+    reasoning, data = _extract_reasoning(data)
 
     # Parse into typed models
     tree = ScenarioTree(
@@ -65,6 +74,7 @@ async def generate_scenario(input_text: str) -> GenerateResponse:
         causes=[CauseNode(**c) for c in data["causes"]],
         consequences=[ConsequenceNode(**c) for c in data["consequences"]],
         input=data.get("input", input_text),
+        reasoning_trace=reasoning,
     )
 
     # Save to Supabase
@@ -90,6 +100,9 @@ async def fork_node(request: ForkRequest) -> ForkResponse:
     )
     data = _call_claude(prompt)
 
+    # Extract reasoning trace
+    reasoning, data = _extract_reasoning(data)
+
     # Set the correct parent_id
     data["parent_id"] = request.parent_node_id
 
@@ -110,6 +123,7 @@ async def fork_node(request: ForkRequest) -> ForkResponse:
         parent_id=request.parent_node_id,
         ripple=data.get("ripple"),
         sensitive=data.get("sensitive", False),
+        reasoning_trace=reasoning,
         children=children,
     )
 

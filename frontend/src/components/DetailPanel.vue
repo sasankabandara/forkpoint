@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { TimelineNodeData } from '../types'
 
 const props = defineProps<{
@@ -11,6 +11,7 @@ const emit = defineEmits<{
 }>()
 
 const data = computed(() => props.node?.data ?? null)
+const reasoningOpen = ref(false)
 
 const typeColor = computed(() => {
   if (!data.value) return ''
@@ -94,6 +95,19 @@ const typeColor = computed(() => {
         <div v-if="data.sensitive" class="sensitive-banner">
           <p>This scenario touches on something heavy. If you're working through something difficult, talking to someone helps.</p>
           <a href="https://findahelpline.com" target="_blank" rel="noopener">Find a helpline →</a>
+        </div>
+
+        <!-- Reasoning trace (collapsible) -->
+        <div v-if="data.reasoningTrace" class="reasoning-section">
+          <button class="reasoning-toggle" @click="reasoningOpen = !reasoningOpen">
+            <svg :class="{ rotated: reasoningOpen }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            AI's thinking process
+          </button>
+          <div v-if="reasoningOpen" class="reasoning-content">
+            <p v-for="(para, i) in data.reasoningTrace.split('\n\n')" :key="i" class="reasoning-text">
+              {{ para }}
+            </p>
+          </div>
         </div>
 
         <!-- Fork button -->
@@ -280,5 +294,51 @@ const typeColor = computed(() => {
 }
 .panel-fork-btn:hover {
   background: rgba(79, 124, 255, 0.2);
+}
+.reasoning-section {
+  margin-bottom: 20px;
+}
+.reasoning-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: color 0.15s;
+}
+.reasoning-toggle:hover {
+  color: var(--color-text-muted);
+}
+.reasoning-toggle svg {
+  transition: transform 0.2s;
+}
+.reasoning-toggle svg.rotated {
+  transform: rotate(90deg);
+}
+.reasoning-content {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.reasoning-text {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  line-height: 1.6;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+.reasoning-text:last-child {
+  margin-bottom: 0;
 }
 </style>

@@ -60,7 +60,7 @@ function loadDemo() {
           :disabled="!input.trim() || store.isLoading"
         >
           <span v-if="!store.isLoading">Explore →</span>
-          <span v-else class="loading-text">Thinking…</span>
+          <span v-else class="loading-text">thinking through the scenario…</span>
         </button>
       </div>
 

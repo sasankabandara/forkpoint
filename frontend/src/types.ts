@@ -35,6 +35,7 @@ export interface ConsequenceNode {
   parent_id: string
   ripple: RippleEffects | null
   sensitive: boolean
+  reasoning_trace?: string
 }
 
 export interface BranchNode extends ConsequenceNode {
@@ -46,6 +47,7 @@ export interface ScenarioTree {
   causes: CauseNode[]
   consequences: ConsequenceNode[]
   input: string
+  reasoning_trace?: string
 }
 
 export interface GenerateResponse {
@@ -71,7 +73,7 @@ export interface ForkResponse {
 }
 
 /* ── Unified node for the canvas ─────────────────────── */
-export type TimelineNodeType = 'cause' | 'pivot' | 'consequence' | 'branch' | 'ghost'
+export type TimelineNodeType = 'cause' | 'pivot' | 'consequence' | 'branch' | 'ghost' | 'fork_signpost'
 
 export interface TimelineNodeData {
   type: TimelineNodeType
@@ -89,6 +91,8 @@ export interface TimelineNodeData {
   depth?: number
   parentNodeId?: string  // for fork reference
   nodeId: string         // original ID from the tree
+  reasoningTrace?: string // AI's reasoning process (collapsible in detail panel)
+  createdAt?: string      // timestamp for signpost nodes
 }
 
 /* ── Branch tracking ─────────────────────────────────── */

@@ -12,4 +12,4 @@ PORT: int = int(os.getenv("PORT", "8000"))
 
 # Claude model to use
 CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
-CLAUDE_MAX_TOKENS: int = 4096
+CLAUDE_MAX_TOKENS: int = 8192
