@@ -19,14 +19,6 @@ Forkpoint is a web app where you describe a decision, event, or turning point �
 
 ---
 
-## 🖼️ Screenshots
-
-| Timeline Canvas | Detail Panel | Branched Timeline |
-|:-:|:-:|:-:|
-| Causes → Pivot → Consequences | Slide-in narrative + ripple effects | Fork nodes appear below |
-
----
-
 ## 🏗️ Architecture
 
 ```
